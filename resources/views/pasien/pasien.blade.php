@@ -23,6 +23,7 @@
                             <th><span>Jenis Kelamin</span></th>
                             <th><span>Mobile No.</span></th>
                             <th>Alamat</th>
+                            <th>Antrian</th>
                             <th>Status</th>
                             <th class="has-edit">Aksi</th>
                         </tr>
@@ -47,34 +48,47 @@
                     url: "{{ route('datatable-pasien') }}",
                 },
                 columns: [{
-                    data: 'DT_RowIndex',
-                    name: 'DT_RowIndex',
-                    class: 'text-center'
-                }, {
-                    data: 'id_pasien',
-                    name: 'id_pasien',
-                }, {
-                    data: 'name',
-                    name: 'name'
-                }, {
-                    data: 'tanggal_lahir',
-                    name: 'tanggal_lahir'
-                }, {
-                    data: 'jenis_kelamin',
-                    name: 'jenis_kelamin'
-                }, {
-                    data: 'telp',
-                    name: 'telp'
-                }, {
-                    data: 'alamat',
-                    name: 'alamat'
-                }, {
-                    data: 'status',
-                    name: 'status'
-                }, {
-                    data: 'aksi',
-                    class: 'text-center',
-                }, ]
+                        data: 'DT_RowIndex',
+                        name: 'DT_RowIndex',
+                        class: 'text-center'
+                    },
+                    {
+                        data: 'id_pasien',
+                        name: 'id_pasien'
+                    },
+                    {
+                        data: 'name',
+                        name: 'name'
+                    },
+                    {
+                        data: 'tanggal_lahir',
+                        name: 'tanggal_lahir'
+                    },
+                    {
+                        data: 'jenis_kelamin',
+                        name: 'jenis_kelamin'
+                    },
+                    {
+                        data: 'telp',
+                        name: 'telp'
+                    },
+                    {
+                        data: 'alamat',
+                        name: 'alamat'
+                    },
+                    {
+                        data: 'antrian',
+                        name: 'antrian'
+                    },
+                    {
+                        data: 'status',
+                        name: 'status'
+                    },
+                    {
+                        data: 'aksi',
+                        class: 'text-center'
+                    }
+                ]
             });
         }())
 

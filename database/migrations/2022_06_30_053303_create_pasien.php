@@ -21,8 +21,7 @@ return new class extends Migration
             $table->enum('jenis_kelamin', ['Laki', 'Perempuan']);
             $table->string('telp');
             $table->string('alamat');
-                        $table->enum('status', ['Aktif', 'Tidak Aktif'])->default('Aktif');
-
+            $table->string('status')->nullable();
             $table->string('created_by');
             $table->string('updated_by');
             $table->timestamps();

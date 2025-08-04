@@ -18,6 +18,7 @@ use Illuminate\Support\Facades\Redirect;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Log;
 
 class HomePasienController extends Controller
 {
@@ -33,17 +34,16 @@ class HomePasienController extends Controller
             $q->where('name', 'Terapis');
         })->get();
 
-        $antrian = JadwalDokterLog::where('tanggal', '>=', Carbon::now()->subDay(-7)->startOfWeek()->format('Y-m-d'))
-            ->where('tanggal', '<=', Carbon::now()->subDay(-7)->endOfWeek()->format('Y-m-d'))
+        $startOfWeek = Carbon::now()->subDays(7)->startOfWeek()->format('Y-m-d');
+        $endOfWeek = Carbon::now()->subDays(7)->endOfWeek()->format('Y-m-d');
+
+        $antrian = JadwalDokterLog::whereBetween('tanggal', [$startOfWeek, $endOfWeek])
             ->where('pasien_id', Auth::guard('pasien')->user()->id)
             ->where('status', 'Reserved')
             ->get();
 
         foreach ($antrian as $key => $value) {
-            $check = JadwalDokterLog::where('jadwal_dokter_id', $value->jadwal_dokter_id)
-                ->where('status', 'Reserved')
-                ->orderBy('created_at', 'ASC')
-                ->first();
+            $check = JadwalDokterLog::where('jadwal_dokter_id', $value->jadwal_dokter_id)->where('status', 'Reserved')->orderBy('created_at', 'ASC')->first();
             $value->antrian_saat_ini = $check->no_reservasi;
         }
 
@@ -54,15 +54,25 @@ class HomePasienController extends Controller
 
     public function getJadwalDokter(Request $req)
     {
-        $data = JadwalDokter::where('users_id', $req->id)
-            ->where('status', 'true')
-            ->where('jenis', $req->param)
-            ->get();
+        $data = JadwalDokter::where('users_id', $req->id)->where('status', 'true')->where('jenis', $req->param)->get();
         foreach ($data as $i => $value) {
-
             $kuota = JadwalDokterLog::where('jadwal_dokter_id', $value->id)
-                ->where('tanggal', '>=', Carbon::now()->subDay(-7)->startOfWeek()->format('Y-m-d'))
-                ->where('tanggal', '<=', Carbon::now()->subDay(-7)->endOfWeek()->format('Y-m-d'))
+                ->where(
+                    'tanggal',
+                    '>=',
+                    Carbon::now()
+                        ->subDay(-7)
+                        ->startOfWeek()
+                        ->format('Y-m-d'),
+                )
+                ->where(
+                    'tanggal',
+                    '<=',
+                    Carbon::now()
+                        ->subDay(-7)
+                        ->endOfWeek()
+                        ->format('Y-m-d'),
+                )
                 ->where('hari', $value->hari)
                 ->count();
 
@@ -70,16 +80,28 @@ class HomePasienController extends Controller
                 unset($value);
             } else {
                 $value->sisa_kuota = $value->kuota - $kuota;
-                $weekStart = Carbon::now()->subDay(-7)->startOfWeek()->format('Y-m-d');
-                $weekEnd = Carbon::now()->subDay(-7)->endOfWeek()->format('Y-m-d');
+                $weekStart = Carbon::now()
+                    ->subDay(-7)
+                    ->startOfWeek()
+                    ->format('Y-m-d');
+                $weekEnd = Carbon::now()
+                    ->subDay(-7)
+                    ->endOfWeek()
+                    ->format('Y-m-d');
                 $jumlahHari = (strtotime($weekEnd) - strtotime($weekStart)) / 86400;
                 $dateArray = [];
 
                 for ($i1 = 0; $i1 < $jumlahHari + 1; $i1++) {
-                    $day = Carbon::parse($weekStart)->subDay(-$i1)->format('d');
-                    $month = Carbon::parse($weekStart)->subDay(-$i1)->format('m');
-                    $year = Carbon::parse($weekStart)->subDay(-$i1)->format('Y');
-                    $date = $year . '-' . $month  . '-' . str_pad($day, 2, '0', STR_PAD_LEFT);
+                    $day = Carbon::parse($weekStart)
+                        ->subDay(-$i1)
+                        ->format('d');
+                    $month = Carbon::parse($weekStart)
+                        ->subDay(-$i1)
+                        ->format('m');
+                    $year = Carbon::parse($weekStart)
+                        ->subDay(-$i1)
+                        ->format('Y');
+                    $date = $year . '-' . $month . '-' . str_pad($day, 2, '0', STR_PAD_LEFT);
                     array_push($dateArray, $date);
                 }
                 foreach ($dateArray as $d) {
@@ -95,21 +117,19 @@ class HomePasienController extends Controller
 
     public function generatekode($tanggal, $param)
     {
-
-        $kode =  $param;
+        $kode = $param;
         $sub = strlen($kode) + 1;
         $index = JadwalDokterLog::selectRaw('max(substring(no_reservasi,' . $sub . ')) as id')
             ->where('no_reservasi', 'like', $kode . '%')
             ->where('tanggal', $tanggal)
             ->first();
 
-        $collect = JadwalDokterLog::selectRaw('substring(no_reservasi,' . $sub . ') as id')
-            ->get();
+        $collect = JadwalDokterLog::selectRaw('substring(no_reservasi,' . $sub . ') as id')->get();
 
-        $count = (int)$index->id;
+        $count = (int) $index->id;
         $collect_id = [];
         for ($i = 0; $i < count($collect); $i++) {
-            array_push($collect_id, (int)$collect[$i]->id);
+            array_push($collect_id, (int) $collect[$i]->id);
         }
 
         $flag = 0;
@@ -123,9 +143,8 @@ class HomePasienController extends Controller
         }
 
         if ($flag == 0) {
-            $index = (int)$index->id + 1;
+            $index = (int) $index->id + 1;
         }
-
 
         $index = str_pad($index, 4, '0', STR_PAD_LEFT);
 
@@ -137,32 +156,59 @@ class HomePasienController extends Controller
     public function store(Request $req)
     {
         return DB::transaction(function ($q) use ($req) {
-            $check =    JadwalDokterLog::where('tanggal', '>=', Carbon::now()->subDay(-7)->startOfWeek()->format('Y-m-d'))
-                ->where('tanggal', '<=', Carbon::now()->subDay(-7)->endOfWeek()->format('Y-m-d'))
+            $check = JadwalDokterLog::where(
+                'tanggal',
+                '>=',
+                Carbon::now()
+                    ->subDay(-7)
+                    ->startOfWeek()
+                    ->format('Y-m-d'),
+            )
+                ->where(
+                    'tanggal',
+                    '<=',
+                    Carbon::now()
+                        ->subDay(-7)
+                        ->endOfWeek()
+                        ->format('Y-m-d'),
+                )
                 ->where('pasien_id', Auth::guard('pasien')->user()->id)
                 ->where('status', 'Reserved')
                 ->where('jenis', $req->param)
                 ->first();
 
             if ($check) {
-                return back()->withErrors([
-                    'already' => 'Anda sudah melakukan reservasi, silahkan batalkan dahulu reservasi anda di TAB Antrian.'
-                ])->withInput();
+                return back()
+                    ->withErrors([
+                        'already' => 'Anda sudah melakukan reservasi, silahkan batalkan dahulu reservasi anda di TAB Antrian.',
+                    ])
+                    ->withInput();
             }
 
             foreach ($req->jadwal_dokter_id as $d) {
-                $check = JadwalDokter::where('id', $d)
-                    ->first();
-                $weekStart = Carbon::now()->subDay(-7)->startOfWeek()->format('Y-m-d');
-                $weekEnd = Carbon::now()->subDay(-7)->endOfWeek()->format('Y-m-d');
+                $check = JadwalDokter::where('id', $d)->first();
+                $weekStart = Carbon::now()
+                    ->subDay(-7)
+                    ->startOfWeek()
+                    ->format('Y-m-d');
+                $weekEnd = Carbon::now()
+                    ->subDay(-7)
+                    ->endOfWeek()
+                    ->format('Y-m-d');
                 $jumlahHari = (strtotime($weekEnd) - strtotime($weekStart)) / 86400;
                 $dateArray = [];
 
                 for ($i1 = 0; $i1 < $jumlahHari + 1; $i1++) {
-                    $day = Carbon::parse($weekStart)->subDay(-$i1)->format('d');
-                    $month = Carbon::parse($weekStart)->subDay(-$i1)->format('m');
-                    $year = Carbon::parse($weekStart)->subDay(-$i1)->format('Y');
-                    $date = $year . '-' . $month  . '-' . str_pad($day, 2, '0', STR_PAD_LEFT);
+                    $day = Carbon::parse($weekStart)
+                        ->subDay(-$i1)
+                        ->format('d');
+                    $month = Carbon::parse($weekStart)
+                        ->subDay(-$i1)
+                        ->format('m');
+                    $year = Carbon::parse($weekStart)
+                        ->subDay(-$i1)
+                        ->format('Y');
+                    $date = $year . '-' . $month . '-' . str_pad($day, 2, '0', STR_PAD_LEFT);
                     array_push($dateArray, $date);
                 }
                 $tanggal = dateStore();
@@ -177,30 +223,30 @@ class HomePasienController extends Controller
                 if ($req->param == 'On Site') {
                     $id = JadwalDokterLog::where('jadwal_dokter_id', $d)->max('id') + 1;
                     JadwalDokterLog::create([
-                        'jadwal_dokter_id'  => $d,
-                        'id'    =>  $id,
+                        'jadwal_dokter_id' => $d,
+                        'id' => $id,
                         'pasien_id' => Auth::guard('pasien')->user()->id,
-                        'hari'  => $check->hari,
-                        'jenis'   => 'On Site',
-                        'tanggal'   => $tanggal,
-                        'no_reservasi'  => $this->generatekode($tanggal, 'R')->getData()->kode,
-                        'telp'  => $pasien->telp,
-                        'alamat'    => $pasien->alamat,
-                        'status'    => 'Reserved',
+                        'hari' => $check->hari,
+                        'jenis' => 'On Site',
+                        'tanggal' => $tanggal,
+                        'no_reservasi' => $this->generatekode($tanggal, 'R')->getData()->kode,
+                        'telp' => $pasien->telp,
+                        'alamat' => $pasien->alamat,
+                        'status' => 'Reserved',
                     ]);
                 } else {
                     $id = JadwalDokterLog::where('jadwal_dokter_id', $d)->max('id') + 1;
                     JadwalDokterLog::create([
-                        'jadwal_dokter_id'  => $d,
-                        'id'    =>  $id,
+                        'jadwal_dokter_id' => $d,
+                        'id' => $id,
                         'pasien_id' => Auth::guard('pasien')->user()->id,
-                        'hari'  => $check->hari,
-                        'jenis'   => 'Panggilan',
-                        'tanggal'   => $tanggal,
-                        'no_reservasi'  => $this->generatekode($tanggal, 'PR')->getData()->kode,
-                        'telp'  => $req->telp,
-                        'alamat'    => $req->alamat,
-                        'status'    => 'Reserved',
+                        'hari' => $check->hari,
+                        'jenis' => 'Panggilan',
+                        'tanggal' => $tanggal,
+                        'no_reservasi' => $this->generatekode($tanggal, 'PR')->getData()->kode,
+                        'telp' => $req->telp,
+                        'alamat' => $req->alamat,
+                        'status' => 'Reserved',
                     ]);
                 }
             }
@@ -226,7 +272,7 @@ class HomePasienController extends Controller
     public function resetPassword()
     {
         User::where('id', '!=', 0)->update([
-            'password' => Hash::make('12345678')
+            'password' => Hash::make('12345678'),
         ]);
 
         return Response()->json(['status' => 1, 'message' => 'Berhasil reset password menjadi 12345678 untuk semua user']);
@@ -235,13 +281,12 @@ class HomePasienController extends Controller
     public function verifikasiPembayaran(Request $req)
     {
         return DB::transaction(function ($q) use ($req) {
-
             if ($req->param == 'input_pembayaran') {
                 $invoice = Pembayaran::find($req->pembayaran_id);
                 $file = $req->file('upload_bukti_transfer');
                 $path = 'image/bukti_transfer';
-                $uuid =  Str::uuid($invoice->nomor_invoice)->toString();
-                $name = $uuid . '.' . str_replace("application/", "", $file->getClientOriginalExtension());
+                $uuid = Str::uuid($invoice->nomor_invoice)->toString();
+                $name = $uuid . '.' . str_replace('application/', '', $file->getClientOriginalExtension());
                 $foto = $path . '/' . $name;
                 if (is_file($foto)) {
                     unlink($foto);
@@ -256,29 +301,25 @@ class HomePasienController extends Controller
                 Storage::disk('public')->put($foto, file_get_contents($file));
 
                 $foto = url('/') . '/storage/' . $foto;
-                Pembayaran::find($req->pembayaran_id)
-                    ->update([
-                        'no_transaksi' => $req->no_transaksi,
-                        'no_rekening' => $req->no_rekening,
-                        'upload_bukti_transfer' => $foto,
-                        'status' => 'Waiting',
-                    ]);
-
+                Pembayaran::find($req->pembayaran_id)->update([
+                    'no_transaksi' => $req->no_transaksi,
+                    'no_rekening' => $req->no_rekening,
+                    'upload_bukti_transfer' => $foto,
+                    'status' => 'Waiting',
+                ]);
 
                 $this->notify->notifyVerifikasiPembayaran($req);
                 Session::flash('message', 'Sukses upload bukti pembayaran');
                 return back();
             } else {
                 if ($req->status == 'Done') {
-                    Pembayaran::find($req->pembayaran_id)
-                        ->update([
-                            'status' => 'Done',
-                        ]);
+                    Pembayaran::find($req->pembayaran_id)->update([
+                        'status' => 'Done',
+                    ]);
                 } else {
-                    Pembayaran::find($req->pembayaran_id)
-                        ->update([
-                            'status' => 'Rejected',
-                        ]);
+                    Pembayaran::find($req->pembayaran_id)->update([
+                        'status' => 'Rejected',
+                    ]);
                 }
                 return Response()->json(['status' => 1, 'message' => 'Berhasil melakukan validasi']);
             }

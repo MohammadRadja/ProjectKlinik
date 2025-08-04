@@ -8,6 +8,8 @@ use App\Models\PasienRekamMedis;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Yajra\DataTables\Facades\DataTables;
+use Illuminate\Support\Facades\Log;
+use Carbon\Carbon;
 
 class PasienController extends Controller
 {
@@ -18,28 +20,44 @@ class PasienController extends Controller
 
     public function datatable(Request $req)
     {
-        $data = Pasien::all();
+        $startOfWeek = Carbon::now()->subDays(7)->startOfWeek()->format('Y-m-d');
+        $endOfWeek = Carbon::now()->subDays(7)->endOfWeek()->format('Y-m-d');
+
+        $data = Pasien::with([
+            'jadwal_dokter_log' => function ($q) use ($startOfWeek, $endOfWeek) {
+                $q->whereBetween('tanggal', [$startOfWeek, $endOfWeek])
+                    ->where('status', 'Reserved')
+                    ->orderBy('created_at', 'ASC');
+            },
+        ])->get();
 
         return DataTables::of($data)
+            ->addColumn('antrian', function ($data) {
+                $first = $data->jadwal_dokter_log->first();
+
+                if (!$first || empty($first->no_reservasi)) {
+                    return '-';
+                }
+
+                // Ambil dua digit terakhir dari no_reservasi (contoh: R0001 -> 01)
+                $nomor = substr($first->no_reservasi, -2);
+
+                return 'Antrian ' . $nomor;
+            })
             ->addColumn('aksi', function ($data) {
                 return view('pasien/action', compact('data'));
             })
             ->addColumn('status', function ($data) {
-                if ($data->status == 'true') {
-                    return '<button class="btn btn--primary" onclick="gantiStatus(false,\'' . $data->id . '\')">Aktif</button>';
-                } else {
-                    return '<button class="btn btn--danger" onclick="gantiStatus(true,\'' . $data->id . '\')">Tidak Aktif</button>';
-                }
+                return $data->status ? '<button class="btn btn--primary" onclick="gantiStatus(false,\'' . $data->id . '\')">Aktif</button>' : '<button class="btn btn--danger" onclick="gantiStatus(true,\'' . $data->id . '\')">Tidak Aktif</button>';
             })
-            ->rawColumns(['aksi', 'status'])
+            ->rawColumns(['aksi', 'status', 'antrian'])
             ->addIndexColumn()
             ->make(true);
     }
 
-
     public function datatableRekamMedis(Request $req)
     {
-        $data = PasienRekamMedis::where('pasien_id', $req->id)->get();;
+        $data = PasienRekamMedis::where('pasien_id', $req->id)->get();
 
         return DataTables::of($data)
             ->addColumn('aksi', function ($data) {
@@ -55,19 +73,18 @@ class PasienController extends Controller
 
     public function generatekode(Request $req)
     {
-        $kode =  'RM';
+        $kode = 'RM';
         $sub = strlen($kode) + 1;
         $index = Pasien::selectRaw('max(substring(id_pasien,' . $sub . ')) as id')
             ->where('id_pasien', 'like', $kode . '%')
             ->first();
 
-        $collect = Pasien::selectRaw('substring(id_pasien,' . $sub . ') as id')
-            ->get();
+        $collect = Pasien::selectRaw('substring(id_pasien,' . $sub . ') as id')->get();
 
-        $count = (int)$index->id;
+        $count = (int) $index->id;
         $collect_id = [];
         for ($i = 0; $i < count($collect); $i++) {
-            array_push($collect_id, (int)$collect[$i]->id);
+            array_push($collect_id, (int) $collect[$i]->id);
         }
 
         $flag = 0;
@@ -81,9 +98,8 @@ class PasienController extends Controller
         }
 
         if ($flag == 0) {
-            $index = (int)$index->id + 1;
+            $index = (int) $index->id + 1;
         }
-
 
         $index = str_pad($index, 4, '0', STR_PAD_LEFT);
 
@@ -107,13 +123,8 @@ class PasienController extends Controller
     public function show(Request $req)
     {
         $data = Pasien::findOrFail($req->id);
-        $tanggalTerakhirPeriksa = JadwalDokterLog::where('pasien_id', $data->id)
-            ->where('status', 'Done')
-            ->first();
-        $tanggalReservasi = JadwalDokterLog::where('pasien_id', $req->id)
-            ->where('status', 'Reserved')
-            ->orderBy('tanggal', 'DESC')
-            ->first();
+        $tanggalTerakhirPeriksa = JadwalDokterLog::where('pasien_id', $data->id)->where('status', 'Done')->first();
+        $tanggalReservasi = JadwalDokterLog::where('pasien_id', $req->id)->where('status', 'Reserved')->orderBy('tanggal', 'DESC')->first();
         $rm = PasienRekamMedis::where('pasien_id', $req->id)->get();
         return view('pasien/show_pasien', compact('data', 'tanggalReservasi', 'tanggalTerakhirPeriksa', 'rm'));
     }
@@ -121,9 +132,7 @@ class PasienController extends Controller
     public function store(Request $req)
     {
         return DB::transaction(function () use ($req) {
-
             $input = $req->all();
-
 
             $input['id'] = Pasien::max('id') + 1;
             $input['created_by'] = me();
@@ -139,7 +148,6 @@ class PasienController extends Controller
     public function update(Request $req)
     {
         return DB::transaction(function () use ($req) {
-
             $input = $req->all();
 
             $input['updated_by'] = me();
@@ -159,10 +167,9 @@ class PasienController extends Controller
     public function status(Request $req)
     {
         return DB::transaction(function () use ($req) {
-            \App\Models\Pasien::where('id', $req->id)
-                ->update([
-                    'status' => $req->param
-                ]);
+            \App\Models\Pasien::where('id', $req->id)->update([
+                'status' => $req->param,
+            ]);
             return Response()->json(['status' => 1, 'message' => 'Status berhasil dirubah']);
         });
     }

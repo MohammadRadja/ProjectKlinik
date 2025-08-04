@@ -41,6 +41,8 @@
                                     <p class="mb-0">Kec. Karawaci, Kota Tangerang, Banten 15116</p>
                                 </div>
                             </div>
+
+                            {{-- Form Login --}}
                             <div class="col-lg-2 right-wrap">
                                 <div class="form-wrap">
                                     <div class="box">
@@ -80,15 +82,24 @@
                                             @endif
 
                                             <!-- Tombol Masuk -->
-                                            <div class="d-grid">
+                                            <div class="d-grid mb-2">
                                                 <button type="submit" class="btn btn-primary">
                                                     <i class="fas fa-sign-in-alt me-1"></i> Masuk
                                                 </button>
                                             </div>
                                         </form>
+
+                                        <!-- Tombol Register -->
+                                        <div class="d-grid">
+                                            <a href="{{ route('register-pasien') }}" class="btn btn-outline-secondary">
+                                                <i class="fas fa-user-plus me-1"></i> Daftar Akun Baru
+                                            </a>
+                                        </div>
+
                                     </div>
                                 </div>
                             </div>
+
                         </div>
                     </div>
                 </main>
