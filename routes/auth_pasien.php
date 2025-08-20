@@ -5,8 +5,8 @@ use App\Http\Controllers\LoginPasienController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', [LoginPasienController::class, 'create']);
-Route::get('/register', [LoginPasienController::class, 'showRegisterForm'])->name('register-pasien');
-Route::post('/register', [LoginPasienController::class, 'register'])->name('register-pasien');
+Route::get('/register-pasien', [LoginPasienController::class, 'showRegisterForm'])->name('register-pasien');
+Route::post('/register-pasien', [LoginPasienController::class, 'register'])->name('register-pasien');
 
 Route::post('login-store-pasien', [LoginPasienController::class, 'store'])->name('login-pasien');
 Route::middleware('pasien')->group(function () {
