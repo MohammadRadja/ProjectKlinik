@@ -18,7 +18,6 @@ class PasienRekamMedis extends Model
         'dokter_id',
         'tindakan',
         'keterangan',
-        'lama_terapi',
         'status_pembayaran',
         'created_by',
         'updated_by',

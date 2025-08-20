@@ -76,10 +76,11 @@
                                                                         id="dokter_id_reservasi" name="dokter_id"
                                                                         title="Pilih Dokter" required="required"
                                                                         onchange="getJadwalDokter('On Site')">
-                                                                        @foreach ($dokter as $item)
-                                                                            <option value="{{ $item->id }}">
-                                                                                {{ $item->name }}</option>
-                                                                        @endforeach
+                                                                        @forelse ($dokter as $item)
+                                                                        <option value="{{ $item->id }}">{{ $item->name }}</option>
+                                                                            @empty
+                                                                        <option disabled selected>Jadwal Dokter tidak tersedia</option>
+                                                                        @endforelse
                                                                     </select>
                                                                 </div>
                                                                 <div class="form-group collapse"
@@ -178,30 +179,32 @@
                                                                 <th><span>Nama Dokter</span></th>
                                                                 <th><span>Antrian Saat Ini</span></th>
                                                                 <th><span>No. Antrian</span></th>
-                                                                <td class="has-action"></td>
+                                                                <td class="has-action"><span>Aksi</span></td>
                                                             </tr>
                                                         </thead>
                                                         <tbody>
-                                                            @foreach ($antrian->sortBy('tanggal') as $i => $item)
+                                                            @forelse ($antrian->sortBy('tanggal') as $i => $item)
                                                                 <tr>
                                                                     <td class="index-antrian">{{ $i + 1 }}</td>
                                                                     <td>{{ CarbonParse($item->tanggal, 'd/m/Y') }}</td>
-                                                                    <td>{{ $item->jadwal_dokter->dokter->name }}</td>
+                                                                    <td>{{ $item->jadwal_dokter->dokter->name ?? '-' }}</td>
                                                                     <td>{{ $item->no_reservasi }}</td>
                                                                     <td>{{ $item->no_reservasi }}</td>
                                                                     <td>
-                                                                        @if (diffdate($item->tanggal, dateStore()) < -1)
+                                                                        @if (diffdate($item->tanggal, dateStore()) > 1)
                                                                             <a class="" style="cursor: pointer"
                                                                                 title="Batalkan reservasi"
                                                                                 onclick="hapus('{{ $item->jadwal_dokter_id }}','{{ $item->id }}',this)">
-                                                                                <img class="svg"
-                                                                                    src="{{ asset('images/ic-delete.svg') }}" />
+                                                                                <img class="svg" src="{{ asset('images/ic-delete.svg') }}" />
                                                                             </a>
                                                                         @endif
-
                                                                     </td>
                                                                 </tr>
-                                                            @endforeach
+                                                            @empty
+                                                                <tr>
+                                                                    <td colspan="6" class="text-center">Tidak ada data antrian</td>
+                                                                </tr>
+                                                            @endforelse
                                                         </tbody>
                                                     </table>
                                                 </div>
@@ -368,7 +371,8 @@
 
                     switch (param) {
                         case 'On Site':
-                            $('#jadwal_dokter_id_reservasi_div').removeClass('collapse')
+                            $('#jadwal_dokter_id_reservasi_div').removeClass('collapse');
+                            $('#jadwal_dokter_id_reservasi').empty();
                             data.data.forEach((d, i) => {
                                 var option = '<option data-hari="' + d.hari + '" value="' + d.id +
                                     '">' + d.tanggal +
@@ -383,20 +387,30 @@
 
                             $('#jadwal_dokter_id_reservasi').selectpicker('refresh');
                             $('#jadwal_dokter_id_reservasi').selectpicker('val', null);
+                            if (data.data.length === 0) {
+                                $('#jadwal_dokter_id_reservasi').empty();
+                                $('#jadwal_dokter_id_reservasi').append('<option value="">Tidak ada jadwal tersedia</option>');
+                                $('#jadwal_dokter_id_reservasi').selectpicker('refresh');
+                                return;
+                            }
                             break;
                         case 'Panggilan':
-                            $('#jadwal_dokter_id_panggilan_div').removeClass('collapse')
-                            data.data.forEach((d, i) => {
-                                var option = '<option data-hari="' + d.hari + '" value="' + d.id +
-                                    '">' + d.tanggal +
-                                    ' | ' +
-                                    capitalizeFirstLetter(d.hari) +
-                                    ' (' + d.sisa_kuota + ')' +
-                                    '</option>';
+                            $('#jadwal_dokter_id_panggilan_div').removeClass('collapse');
+                            $('#jadwal_dokter_id_panggilan').empty();
+                            if (data.data.length > 0) {
+                                data.data.forEach((d, i) => {
+                                    var option = '<option data-hari="' + d.hari + '" value="' + d.id + '">' 
+                                        + d.tanggal + ' | ' 
+                                        + capitalizeFirstLetter(d.hari) 
+                                        + ' (' + d.sisa_kuota + ')' 
+                                        + '</option>';
 
-                                $('#jadwal_dokter_id_panggilan').append(option);
-
-                            });
+                                    $('#jadwal_dokter_id_panggilan').append(option);
+                                });
+                            } else {
+                                // kalau tidak ada jadwal sama sekali
+                                $('#jadwal_dokter_id_panggilan').append('<option value="">Tidak ada jadwal tersedia</option>');
+                            }
 
                             $('#jadwal_dokter_id_panggilan').selectpicker('refresh');
                             $('#jadwal_dokter_id_panggilan').selectpicker('val', null);
