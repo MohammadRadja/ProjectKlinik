@@ -19,6 +19,7 @@ use Illuminate\Support\Facades\Session;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Log;
+use App\Services\TwilioService;
 
 class HomePasienController extends Controller
 {
@@ -31,14 +32,13 @@ class HomePasienController extends Controller
     public function index()
     {
         $dokter = \App\Models\User::whereHas('role', function ($q) {
-            $q->where('name', 'Terapis');
+            $q->where('name', 'dokter');
         })->get();
 
-        $startOfWeek = Carbon::now()->subDays(7)->startOfWeek()->format('Y-m-d');
-        $endOfWeek = Carbon::now()->subDays(7)->endOfWeek()->format('Y-m-d');
+       $startOfWeek = Carbon::now()->format('Y-m-d');
+       $endOfWeek   = Carbon::now()->addDays(7)->format('Y-m-d');
 
         $antrian = JadwalDokterLog::whereBetween('tanggal', [$startOfWeek, $endOfWeek])
-            ->where('pasien_id', Auth::guard('pasien')->user()->id)
             ->where('status', 'Reserved')
             ->get();
 
@@ -46,7 +46,7 @@ class HomePasienController extends Controller
             $check = JadwalDokterLog::where('jadwal_dokter_id', $value->jadwal_dokter_id)->where('status', 'Reserved')->orderBy('created_at', 'ASC')->first();
             $value->antrian_saat_ini = $check->no_reservasi;
         }
-
+       
         $rm = PasienRekamMedis::where('pasien_id', Auth::guard('pasien')->user()->id)->get();
         $invoice = Pembayaran::where('pasien_id', Auth::guard('pasien')->user()->id)->get();
         return view('dashboard_pasien', compact('dokter', 'antrian', 'rm', 'invoice'));
@@ -156,6 +156,7 @@ class HomePasienController extends Controller
     public function store(Request $req)
     {
         return DB::transaction(function ($q) use ($req) {
+            $twilio = new TwilioService();
             $check = JadwalDokterLog::where(
                 'tanggal',
                 '>=',
@@ -222,7 +223,7 @@ class HomePasienController extends Controller
 
                 if ($req->param == 'On Site') {
                     $id = JadwalDokterLog::where('jadwal_dokter_id', $d)->max('id') + 1;
-                    JadwalDokterLog::create([
+                    $log = JadwalDokterLog::create([
                         'jadwal_dokter_id' => $d,
                         'id' => $id,
                         'pasien_id' => Auth::guard('pasien')->user()->id,
@@ -236,7 +237,7 @@ class HomePasienController extends Controller
                     ]);
                 } else {
                     $id = JadwalDokterLog::where('jadwal_dokter_id', $d)->max('id') + 1;
-                    JadwalDokterLog::create([
+                    $log = JadwalDokterLog::create([
                         'jadwal_dokter_id' => $d,
                         'id' => $id,
                         'pasien_id' => Auth::guard('pasien')->user()->id,
@@ -250,6 +251,9 @@ class HomePasienController extends Controller
                     ]);
                 }
             }
+
+            $message = "Halo {$pasien->nama},\nReservasi Anda berhasil!\nNomor Antrian: {$log->no_reservasi}\nTanggal: {$log->tanggal}\nJenis: {$log->jenis}";
+            $twilio ->sendWhatsapp($pasien->telp, $message);
 
             return redirect()->route('antrian', ['id' => Crypt::encrypt(Auth::guard('pasien')->user()->id), 'jadwal_dokter_id' => $req->jadwal_dokter_id]);
         });

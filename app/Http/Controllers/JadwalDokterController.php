@@ -22,7 +22,7 @@ class JadwalDokterController extends Controller
 
     public function datatable(Request $req)
     {
-        if (Auth::user()->role->name == 'Terapis') {
+        if (Auth::user()->role->name == 'Dokter') {
             $data = JadwalDokter::where('users_id', Auth::user()->id)->get();
         } else {
             $data = JadwalDokter::get();
@@ -63,7 +63,7 @@ class JadwalDokterController extends Controller
     public function create(Request $req)
     {
         $dokter = User::whereHas('role', function ($q) use ($req) {
-            $q->where('name', 'Terapis');
+            $q->where('name', 'Dokter');
         })->where(function ($q) {
             if (Auth::user()->role == 'Terapis') {
                 $q->where('id', Auth::user()->id);
