@@ -13,6 +13,19 @@
 
     <!-- BEGIN: CSS Assets-->
     <style>
+        html {
+            scroll-behavior: smooth;
+            font-family: 'Poppins', sans-serif;
+        }
+
+        body,
+        html {
+            margin: 0 !important;
+            padding: 0 !important;
+            overflow-x: hidden;
+            /* cegah scroll horizontal */
+        }
+
         .swal2-container {
             z-index: 999999999999999999999999999999999 !important;
         }
@@ -69,8 +82,16 @@
 </head>
 <!-- END: Head -->
 
-@yield('body')
-@include('../layouts/script')
-@yield('script')
+<body>
+    <div class="loading style-2" id="loading">
+        <div class="loading-wheel"></div>
+    </div>
+    <main class="container-fluid">
+        @include('../layouts/navigasi')
+        @yield('body')
+        @include('../layouts/script')
+        @yield('script')
+    </main>
+</body>
 
 </html>
